@@ -1,0 +1,42 @@
+REPOSITORY CONTENTS
+Generated: 2026-05-14 18:24:01
+============================================================
+
+  .gitignore                                                              0 KB
+  final_thesis_results\animations\defense_main_animation.mp4            331 KB
+  final_thesis_results\logs\final_run_log.txt                             5 KB
+  final_thesis_results\selected_for_thesis\all_field_obstacles_3d.png     760 KB
+  final_thesis_results\selected_for_thesis\defense_metrics_panel.png     249 KB
+  final_thesis_results\selected_for_thesis\defense_mode_timeline.png      57 KB
+  final_thesis_results\selected_for_thesis\defense_top_view.png         326 KB
+  final_thesis_results\selected_for_thesis\defense_trajectory_3d.png     633 KB
+  final_thesis_results\selected_for_thesis\uniform_field_obstacles_3d.png     776 KB
+  final_thesis_results\selected_for_thesis\vertical_escape_corridor_top_view.png     257 KB
+  final_thesis_results\summary\all_metrics_summary.csv                    1 KB
+  final_thesis_results\summary\selected_metrics_table.csv                 0 KB
+  final_thesis_runner.py                                                 33 KB
+  pics\all_field_obstacles_3d.png                                       760 KB
+  pics\defense_metrics_panel.png                                        249 KB
+  pics\defense_mode_timeline.png                                         57 KB
+  pics\defense_top_view.png                                             326 KB
+  pics\defense_trajectory_3d.png                                        633 KB
+  pics\dense_field_mode_timeline.png                                     51 KB
+  pics\dense_field_trajectory_3d.png                                    527 KB
+  pics\free_trajectory_3d.png                                           314 KB
+  pics\single_obstacle_trajectory_3d.png                                422 KB
+  pics\uniform_field_obstacles_3d.png                                   776 KB
+  pics\vertical_escape_corridor_mode_timeline.png                        57 KB
+  pics\vertical_escape_corridor_top_view.png                            257 KB
+  README.md                                                               7 KB
+  requirements.txt                                                        0 KB
+  results_defense_showcase\animations\defense_main_animation.gif       7338 KB
+  results_defense_showcase\figures\defense_metrics_panel.png            177 KB
+  results_defense_showcase\figures\defense_mode_timeline.png             40 KB
+  results_defense_showcase\figures\defense_top_view.png                 288 KB
+  results_defense_showcase\figures\defense_trajectory_3d.png            585 KB
+  results_defense_showcase\logs\defense_run_log.txt                       0 KB
+  results_defense_showcase\metrics\defense_metrics.csv                   82 KB
+  results_defense_showcase\metrics\defense_summary.csv                    0 KB
+  swarm_3d_experiments.py                                                63 KB
+
+Total: 16 MB (16452 KB)

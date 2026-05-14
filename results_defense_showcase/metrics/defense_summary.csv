@@ -1,0 +1,2 @@
+scenario,strategy,mean_formation_error,min_pair_distance,min_obstacle_clearance,final_energy,final_path_length,last_mode,max_center_z,n_steps
+defense_showcase,adaptive,0.45357154078739387,0.8085000039213607,0.10328841874212658,357.6614066131003,76.27962360381177,normal,1.85,533

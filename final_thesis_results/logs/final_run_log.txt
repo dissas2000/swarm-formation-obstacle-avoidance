@@ -1,0 +1,130 @@
+Финальный прогон ВКР — swarm_3d_experiments
+Дата: 2026-05-14 14:38:53
+============================================================
+
+[free]
+  шагов:      510
+  режимы:     ['normal']
+  мин. зазор: inf (нет препятствий)
+  мин. пара:  0.808500
+  ср. ошибка: 0.162644
+
+[single]
+  шагов:      771
+  режимы:     ['column', 'normal']
+  мин. зазор: 0.587211
+  мин. пара:  0.808500
+  ср. ошибка: 0.412691
+
+[dense_field]
+  шагов:      786
+  режимы:     ['column', 'normal']
+  мин. зазор: 0.607104
+  мин. пара:  0.765660
+  ср. ошибка: 0.398326
+
+[all_field_obstacles]
+  шагов:      625
+  режимы:     ['column', 'normal', 'overflight']
+  мин. зазор: 0.100000
+  мин. пара:  0.808500
+  ср. ошибка: 0.950381
+
+[uniform_field_obstacles]
+  шагов:      625
+  режимы:     ['column', 'compressed', 'normal']
+  мин. зазор: 0.100000
+  мин. пара:  0.713530
+  ср. ошибка: 1.166928
+
+[defense_showcase]
+  шагов:      533
+  режимы:     ['column', 'compressed', 'normal', 'overflight']
+  мин. зазор: 0.103288
+  мин. пара:  0.808500
+  ср. ошибка: 0.453572
+
+[vertical_escape_corridor]
+  шагов:      510
+  режимы:     ['column', 'normal', 'overflight']
+  мин. зазор: 0.100586
+  мин. пара:  0.808500
+  ср. ошибка: 0.397689
+
+============================================================
+ПРОВЕРКИ
+============================================================
+
+1. min_obstacle_clearance > 0:
+   free                               : нет препятствий  [N/A]
+   single                             : 0.5872  [OK]
+   dense_field                        : 0.6071  [OK]
+   all_field_obstacles                : 0.1000  [OK]
+   uniform_field_obstacles            : 0.1000  [OK]
+   defense_showcase                   : 0.1033  [OK]
+   vertical_escape_corridor           : 0.1006  [OK]
+
+2. min_pair_distance > 0.7 (defense_showcase):
+   min_pair_distance = 0.8085  [OK]
+
+3. Режимы в defense_showcase:
+   column              : [OK]
+   compressed          : [OK]
+   normal              : [OK]
+   overflight          : [OK]
+
+4. vertical_escape_corridor:
+   overflight присутствует            : [OK]
+   max_center_z = 1.850 (exp 1.7–1.9) : [OK]
+   min_clearance = 0.1006              : [OK]
+   min_pair      = 0.8085 (exp >0.7) : [OK]
+
+Время выполнения: 44.8 с
+Итог проверок: ВСЕ OK
+Всего файлов: 44
+
+Список сохранённых файлов:
+  final_thesis_results\figures\free\trajectory_3d.png
+  final_thesis_results\figures\free\top_view.png
+  final_thesis_results\figures\free\metrics_panel.png
+  final_thesis_results\figures\free\mode_timeline.png
+  final_thesis_results\figures\free\metrics.csv
+  final_thesis_results\figures\single\trajectory_3d.png
+  final_thesis_results\figures\single\top_view.png
+  final_thesis_results\figures\single\metrics_panel.png
+  final_thesis_results\figures\single\mode_timeline.png
+  final_thesis_results\figures\single\metrics.csv
+  final_thesis_results\figures\dense_field\trajectory_3d.png
+  final_thesis_results\figures\dense_field\top_view.png
+  final_thesis_results\figures\dense_field\metrics_panel.png
+  final_thesis_results\figures\dense_field\mode_timeline.png
+  final_thesis_results\figures\dense_field\metrics.csv
+  final_thesis_results\figures\all_field_obstacles\trajectory_3d.png
+  final_thesis_results\figures\all_field_obstacles\top_view.png
+  final_thesis_results\figures\all_field_obstacles\metrics_panel.png
+  final_thesis_results\figures\all_field_obstacles\mode_timeline.png
+  final_thesis_results\figures\all_field_obstacles\metrics.csv
+  final_thesis_results\figures\uniform_field_obstacles\trajectory_3d.png
+  final_thesis_results\figures\uniform_field_obstacles\top_view.png
+  final_thesis_results\figures\uniform_field_obstacles\metrics_panel.png
+  final_thesis_results\figures\uniform_field_obstacles\mode_timeline.png
+  final_thesis_results\figures\uniform_field_obstacles\metrics.csv
+  final_thesis_results\figures\defense_showcase\trajectory_3d.png
+  final_thesis_results\figures\defense_showcase\top_view.png
+  final_thesis_results\figures\defense_showcase\metrics_panel.png
+  final_thesis_results\figures\defense_showcase\mode_timeline.png
+  final_thesis_results\figures\defense_showcase\metrics.csv
+  final_thesis_results\figures\vertical_escape_corridor\trajectory_3d.png
+  final_thesis_results\figures\vertical_escape_corridor\top_view.png
+  final_thesis_results\figures\vertical_escape_corridor\metrics_panel.png
+  final_thesis_results\figures\vertical_escape_corridor\mode_timeline.png
+  final_thesis_results\figures\vertical_escape_corridor\metrics.csv
+  final_thesis_results\summary\all_metrics_summary.csv
+  final_thesis_results\summary\selected_metrics_table.csv
+  final_thesis_results\selected_for_thesis\defense_trajectory_3d.png
+  final_thesis_results\selected_for_thesis\defense_top_view.png
+  final_thesis_results\selected_for_thesis\defense_mode_timeline.png
+  final_thesis_results\selected_for_thesis\defense_metrics_panel.png
+  final_thesis_results\selected_for_thesis\all_field_obstacles_3d.png
+  final_thesis_results\selected_for_thesis\uniform_field_obstacles_3d.png
+  final_thesis_results\selected_for_thesis\vertical_escape_corridor_top_view.png

@@ -1,0 +1,14 @@
+scenario: defense_showcase / adaptive
+n_steps:               533
+max_center_z:          1.8500
+min_obstacle_clearance:0.103288
+min_pair_distance:     0.808500
+mean_formation_error:  0.453572
+final_energy:          357.6614
+final_path_length:     76.2796
+
+mode counts:
+  normal: 201
+  overflight: 152
+  compressed: 106
+  column: 74
