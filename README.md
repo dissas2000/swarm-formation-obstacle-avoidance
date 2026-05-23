@@ -1,186 +1,220 @@
-# Swarm Formation with 3D Obstacle Avoidance
+# 3D-эксперименты для ВКР
 
-**Adaptive formation control for a five-UAV group in a 3-D obstacle environment.**
+Тема: **моделирование группового движения в среде с препятствиями**.
 
-Numerical experiments for a bachelor's thesis (ВКР) on multi-agent systems.
+Этот пакет содержит автономную Python-симуляцию, не зависящую от ARGoS. Она нужна для численных экспериментов, построения графиков, получения метрик и подготовки иллюстраций для диплома и презентации.
 
----
+## Математическая модель
 
-## Идея
+Модель агента (система второго порядка):
 
-Группа из 5 дронов (1 лидер + 4 ведомых) движется от старта к цели,
-сохраняя формацию и адаптируясь к препятствиям в режиме реального времени.
-
-Центр группы следует по заранее построенному опорному пути.
-Каждый дрон получает желаемую позицию:
-
-```
-p_i^des(t) = p_c(t) + R(t) · Δ_i^(m(t))
+```text
+p_dot_i = v_i
+m_i * v_dot_i = F_i
 ```
 
-Суммарная сила на каждый дрон:
+Желаемое положение агента:
 
-```
-F_i = F_i^formation + F_i^obstacle + F_i^damping
-F_i^formation = F_i^pos + F_i^sep + F_i^coh
-```
-
-| Компонент | Смысл |
-|-----------|-------|
-| `F_pos`     | притяжение к слоту в формации |
-| `F_sep`     | отталкивание от соседей |
-| `F_coh`     | удержание связности группы |
-| `F_obstacle`| реакция на цилиндрические препятствия |
-| `F_damping` | демпфирование скорости |
-
----
-
-## Режимы адаптации формации
-
-Контроллер выбирает режим автоматически в зависимости от обстановки:
-
-| Режим | Когда включается |
-|-------|-----------------|
-| `normal`     | нет препятствий поблизости, формация не стеснена |
-| `compressed` | боковое пространство сужается, формация сжимается по ширине |
-| `column`     | очень узкий проход, перестроение в одну колонну |
-| `overflight` | низкое препятствие — группа перелетает сверху |
-
----
-
-## Структура проекта
-
-```
-swarm_formation_obstacle_avoidance_repo/
-├── swarm_3d_experiments.py      # Основной файл: модель, сценарии, контроллер
-├── final_thesis_runner.py       # Финальный прогон всех сценариев для ВКР
-├── requirements.txt
-├── .gitignore
-├── README.md
-│
-├── final_thesis_results/        # Финальные результаты
-│   ├── summary/                 # Сводные CSV по всем сценариям
-│   ├── selected_for_thesis/     # Лучшие рисунки для диплома
-│   ├── animations/              # MP4/GIF анимации
-│   └── logs/                   # Лог финального прогона
-│
-├── results_defense_showcase/    # Детальные материалы для защиты
-│   ├── figures/                 # PNG-рисунки
-│   ├── metrics/                 # CSV метрики
-│   ├── animations/              # GIF анимации
-│   └── logs/
-│
-└── pics/                        # Рисунки, отобранные для текста диплома
+```text
+p_i^des(t) = p_c(t) + R(t) * Delta_i^(m(t))
 ```
 
----
+где `p_c(t)` — виртуальный центр, `R(t)` — матрица поворота, `Delta_i^m` — смещение в строю.
+
+### Пять компонент силы управления
+
+```text
+F_i = F_i^target + F_i^formation + F_i^obstacle + F_i^damping + F_i^height
+```
+
+| Компонента | Формула / смысл |
+|---|---|
+| `F_target`   | `k_target * (p_c_xy - p_i_xy)` — горизонтальное движение к цели |
+| `F_formation`| `F_pos + F_sep + F_coh` — поддержание формации |
+| `F_pos`      | `k_pos * R * Delta_i^m` — коррекция к желаемому положению в строю |
+| `F_sep`      | отталкивание при слишком малом расстоянии между агентами |
+| `F_coh`      | притяжение к центру (удержание группы) |
+| `F_obstacle` | `F_rep + F_tan` — нормальная + касательная компонента обхода |
+| `F_damping`  | `-k_damp * v_i` — демпфирование скорости |
+| `F_height`   | `k_z*(z_des - z_i)*e_z - beta_z*v_z*e_z` — стабилизация высоты |
+
+При режиме `overflight`: `z_des = h_obs + h_safe`, если `h_obs + h_safe ≤ h_max`.
+
+## Четыре режима движения
+
+Иерархия выбора: `normal` → `compressed` → `overflight` (если есть низкое препятствие) → `column`.
+
+| Режим | Смысл | Когда активируется |
+|---|---|---|
+| `normal`     | базовая формация, широкое расстановление | зазор до препятствий достаточен |
+| `compressed` | сжатая формация, уменьшено поперечное расстояние | нормальная формация не помещается |
+| `column`     | движение колонной, минимальная ширина | ни normal ни compressed не помещаются |
+| `overflight` | перелёт низких препятствий сверху | боковой обход затруднён + препятствие достаточно низкое |
+
+## Ограждение по периметру
+
+Во всех сценариях добавлено ограждение по периметру области:
+
+```text
+[-6, 6] x [-6, 6]
+```
+
+Ограждение задаётся как набор цилиндрических препятствий с флагом `is_boundary=True`.
+
+Оно нужно, чтобы:
+
+- сцена выглядела как ограниченная рабочая область;
+- планировщик не выбирал путь за пределами сцены;
+- на визуализациях было понятно, где границы эксперимента.
 
 ## Установка зависимостей
 
-### conda (рекомендуется)
+Рекомендуется использовать conda или venv.
+
+### Вариант conda
 
 ```bash
-conda create -n dronesim python=3.10
-conda activate dronesim
+conda create -n swarm3d python=3.11
+conda activate swarm3d
 pip install -r requirements.txt
-# для MP4: conda install -c conda-forge ffmpeg
 ```
 
-### venv
+### Вариант venv
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
----
-
-## Запуск
-
-### Один сценарий (быстро, только CSV)
-
-```bash
-python swarm_3d_experiments.py --scenario defense_showcase --no-plots
-```
-
-### Один сценарий с рисунками
-
-```bash
-python swarm_3d_experiments.py --scenario vertical_escape_corridor
-```
-
-### Все сценарии + рисунки
+## Запуск всех экспериментов
 
 ```bash
 python swarm_3d_experiments.py
 ```
 
-### Финальный прогон для ВКР (все 7 сценариев + рисунки + проверки)
+После запуска появится папка:
 
-```bash
-python final_thesis_runner.py --skip-animation
+```text
+results_3d_extended/
 ```
 
-### Финальный прогон с GIF/MP4 для defense_showcase
+В ней будет общая таблица:
 
-```bash
-python final_thesis_runner.py
+```text
+summary_all.csv
 ```
 
-### Только MP4 для defense_showcase
+## Запуск одного сценария
 
 ```bash
-python final_thesis_runner.py --only-mp4
+python swarm_3d_experiments.py --scenario wide_barrier
 ```
 
----
+## Запуск одного сценария с анимацией
 
-## Сценарии
+```bash
+python swarm_3d_experiments.py --scenario wide_barrier --show
+```
 
-| Сценарий | Описание | Основные режимы |
-|----------|----------|----------------|
-| `free` | Свободное движение, нет препятствий | normal |
-| `single` | Одиночные препятствия | normal, column |
-| `dense_field` | Плотная среда препятствий | normal, column |
-| `all_field_obstacles` | Шахматное поле разной высоты | normal, column, overflight |
-| `uniform_field_obstacles` | Шахматное поле одинаковой высоты | normal, compressed, column |
-| `defense_showcase` | Демонстрация всех 4 режимов | normal, compressed, column, overflight |
-| `vertical_escape_corridor` | Боковой обход закрыт, только вверх | normal, overflight |
+или:
 
----
+```bash
+python swarm_3d_experiments.py --scenario low_wall_overflight --show
+```
 
-## Результаты (final_thesis_results/)
+## Доступные сценарии
 
-| Папка | Содержание |
-|-------|-----------|
-| `summary/` | `all_metrics_summary.csv` — все метрики по всем сценариям |
-| `summary/` | `selected_metrics_table.csv` — краткая таблица для диплома |
-| `selected_for_thesis/` | Лучшие PNG для вставки в текст ВКР |
-| `animations/` | `defense_main_animation.mp4` (H.264) |
-| `logs/` | `final_run_log.txt` — результаты всех проверок |
+| Сценарий | Назначение |
+|---|---|
+| `free`                  | свободное движение без препятствий |
+| `single`                | одиночные препятствия |
+| `wide_barrier`          | препятствия по всей ширине, боковой облёт |
+| `dense_field`           | плотная среда препятствий |
+| `checkerboard_equal`    | шахматное поле препятствий одинаковой высоты |
+| `checkerboard_unequal`  | шахматное поле препятствий разной высоты |
+| `low_wall_overflight`   | низкая стенка, группа перелетает сверху |
+| `tall_wall_side`        | высокая стенка, группа облетает сбоку |
+| `vertical_exit`         | единственный выход через верх (стена перекрывает ширину) |
+| `defense_showcase`      | демонстрация всех четырёх режимов: normal→compressed→column→overflight |
 
----
-
-## Метрики
+## Метрики (по ВКР)
 
 | Метрика | Смысл |
-|---------|-------|
-| `formation_error` | среднее отклонение дронов от желаемых позиций в формации, м |
-| `min_pair_distance` | минимальное расстояние между любой парой дронов, м |
-| `min_obstacle_clearance` | минимальный зазор от любого дрона до любого препятствия, м |
-| `total_energy` | суммарная потраченная энергия группы (∝ ∫‖F‖² dt) |
-| `total_path_length` | суммарная длина путей всех дронов, м |
-| `mode` | текущий режим формации (normal/compressed/column/overflight) |
-| `center_z` | высота виртуального центра группы, м |
+|---|---|
+| `formation_error`       | средняя ошибка формации (м) |
+| `min_agent_distance`    | минимальное расстояние между агентами (м) |
+| `min_obstacle_clearance`| минимальный зазор до препятствий (м) |
+| `energy`                | энергетическая цена: ∫‖F‖² dt (Дж·с) |
+| `path_length`           | суммарная длина траекторий всех агентов (м) |
+| `max_height`            | максимальная высота полёта (м) |
 
----
+## Структура результатов
 
-## Проверки безопасности (автоматические)
+Для каждого сценария и стратегии создаётся папка:
 
-`final_thesis_runner.py` в конце прогона выводит:
+```text
+results_3d_extended/<scenario>/<strategy>/
+```
 
-- `min_obstacle_clearance > 0` для каждого сценария;
-- `min_pair_distance > 0.7` для defense_showcase;
-- все 4 режима присутствуют в defense_showcase;
-- overflight активируется в vertical_escape_corridor, `max_center_z ∈ [1.7, 1.9]`.
+Внутри:
+
+| Файл | Содержание |
+|---|---|
+| `metrics.csv`         | все метрики по времени |
+| `trajectory_3d.png`   | 3D-траектории |
+| `top_view.png`        | вид сверху |
+| `safety_metrics.png`  | formation_error, min_agent_distance, min_obstacle_clearance |
+| `height_profile.png`  | профиль высоты max_height(t) |
+| `mode_timeline.png`   | переключения режимов движения |
+
+Сводная таблица по всем сценариям:
+
+```text
+results_3d_extended/summary_all.csv
+```
+
+## Примеры запуска
+
+```bash
+# Все сценарии (создаёт results_3d_extended/)
+python swarm_3d_experiments1.py
+
+# Один сценарий
+python swarm_3d_experiments1.py --scenario defense_showcase
+
+# Со смотрителем анимации
+python swarm_3d_experiments1.py --scenario defense_showcase --show
+
+# Демонстрация перелёта
+python swarm_3d_experiments1.py --scenario vertical_exit --show
+
+# Базовая симуляция (results_3d/)
+python swarm_3d_simulation1.py
+```
+
+## Главные сценарии для диплома
+
+| Сценарий | Что показывает |
+|---|---|
+| `defense_showcase`     | все четыре режима, демонстрационный сценарий |
+| `vertical_exit`        | режим overflight как единственный выход |
+| `checkerboard_unequal` | адаптация к разновысоким препятствиям |
+| `dense_field`          | стресс-тест адаптивной стратегии |
+| `wide_barrier`         | сравнение fixed vs adaptive |
+
+## Что отправлять на анализ
+
+После запуска можно отправить архив папки:
+
+```text
+results_3d_extended/
+```
+
+По ней можно проверить:
+
+- где была минимальная дистанция между дронами;
+- насколько безопасно пройдены препятствия;
+- какие режимы включались;
+- как отличаются `fixed` и `adaptive`;
+- какие картинки лучше вставить в диплом.
