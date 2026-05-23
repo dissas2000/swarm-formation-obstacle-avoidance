@@ -27,36 +27,60 @@ import numpy as np
 import pandas as pd
 
 # ── Подключаем модуль симуляции ────────────────────────────────────────────────
-_MODULE_DIR = Path(__file__).parent / "swarm_3d_extended_experiments4"
+# Импортируем обновлённую версию (swarm_3d_experiments1.py) с тремя
+# критическими исправлениями:
+#   1. Гибридный выбор стороны касательной (по центру группы для общих
+#      препятствий, по позиции дрона для локальных) — устраняет встречные
+#      потоки агентов в сценарии tall_wall_side.
+#   2. EMA-сглаживание направления path с alpha=0.04 — предотвращает
+#      слипание агентов в column на резких 90° поворотах.
+#   3. F_target вынесена в явную функцию (раньше была частью F_coh)
+#      — соответствует формуле 8 диплома.
+#
+# По умолчанию ожидается модуль swarm_3d_experiments1.py в той же папке.
+# Если используется другая структура, измените _MODULE_DIR / _MODULE_NAME.
+_MODULE_DIR = Path(__file__).parent
+_MODULE_NAME = "swarm_3d_experiments1"
 sys.path.insert(0, str(_MODULE_DIR))
 
-from swarm_3d_experiments import (
-    COLORS,
-    ROLES,
-    AdaptiveFormationController3D,
-    Drone3D,
-    ObstacleCylinder,
-    Scenario,
-    cylinder_clearance_3d,
-    draw_cylinder,
-    make_drones,
-    make_scenarios,
-    norm,
-    summarize,
-    unit,
-)
+# Fallback: если файл swarm_3d_experiments1.py отсутствует, пробуем старое имя
+try:
+    import importlib
+    _sim = importlib.import_module(_MODULE_NAME)
+except ImportError as exc:
+    raise ImportError(
+        f"[runner] Не удалось импортировать {_MODULE_NAME}.py. "
+        "Проверьте, что файл находится в корне репозитория и что установлены зависимости."
+    ) from exc
+
+COLORS = _sim.COLORS
+ROLES = _sim.ROLES
+AdaptiveFormationController3D = _sim.AdaptiveFormationController3D
+Drone3D = _sim.Drone3D
+ObstacleCylinder = _sim.ObstacleCylinder
+Scenario = _sim.Scenario
+cylinder_clearance_3d = _sim.cylinder_clearance_3d
+draw_cylinder = _sim.draw_cylinder
+make_drones = _sim.make_drones
+make_scenarios = _sim.make_scenarios
+norm = _sim.norm
+summarize = _sim.summarize
+unit = _sim.unit
 
 # ── Константы ──────────────────────────────────────────────────────────────────
 OUTPUT_ROOT = Path("final_thesis_results")
 
 SCENARIOS_TO_RUN: List[str] = [
-    "free",
-    "single",
-    "dense_field",
-    "all_field_obstacles",
-    "uniform_field_obstacles",
-    "defense_showcase",
-    "vertical_escape_corridor",
+    "free",                  # свободное движение, базовая формация
+    "single",                # одиночные препятствия (tangential avoidance)
+    "wide_barrier",          # широкая полоса препятствий, боковой облёт
+    "dense_field",           # плотная среда препятствий
+    "low_wall_overflight",   # низкая стенка, перелёт сверху (overflight)
+    "tall_wall_side",        # высокая стенка, боковой облёт (требует согл. обхода)
+    "checkerboard_equal",    # шахматное поле одинаковой высоты (контроль)
+    "checkerboard_unequal",  # шахматное поле разной высоты
+    "vertical_exit",         # единственный выход через верх (overflight ключевой)
+    "defense_showcase",      # последовательная демонстрация всех 4 режимов
 ]
 
 RUSSIAN_LABELS: Dict[str, str] = {
@@ -113,6 +137,10 @@ def run_scenario(
         if norm(center - controller.goal_center) < 0.12 and k > 200:
             break
     df = pd.DataFrame(rows)
+    # Алиас для обратной совместимости с runner'ом (старое имя поля)
+    # В новой версии модуля поле называется min_agent_distance.
+    if "min_agent_distance" in df.columns and "min_pair_distance" not in df.columns:
+        df["min_pair_distance"] = df["min_agent_distance"]
     return df, drones, controller
 
 
@@ -525,10 +553,12 @@ def main(skip_animation: bool = False) -> None:
     saved_files.append(all_metrics_csv)
 
     # Краткая таблица с русскими названиями столбцов
+    # В новой версии модуля имена полей: min_agent_distance (раньше min_pair_distance),
+    # energy (раньше final_energy), path_length (раньше final_path_length)
     selected_cols = [
         "scenario", "mean_formation_error",
-        "min_pair_distance", "min_obstacle_clearance",
-        "final_energy", "final_path_length", "last_mode",
+        "min_agent_distance", "min_obstacle_clearance",
+        "energy", "path_length", "last_mode",
     ]
     selected_df = summary_df[selected_cols].copy()
     selected_df.columns = [
@@ -583,16 +613,24 @@ def main(skip_animation: bool = False) -> None:
         "defense_metrics_panel.png",
     )
     copy_to_selected(
-        dirs["figures"] / "all_field_obstacles" / "trajectory_3d.png",
-        "all_field_obstacles_3d.png",
+        dirs["figures"] / "checkerboard_unequal" / "trajectory_3d.png",
+        "checkerboard_unequal_3d.png",
     )
     copy_to_selected(
-        dirs["figures"] / "uniform_field_obstacles" / "trajectory_3d.png",
-        "uniform_field_obstacles_3d.png",
+        dirs["figures"] / "checkerboard_equal" / "trajectory_3d.png",
+        "checkerboard_equal_3d.png",
     )
     copy_to_selected(
-        dirs["figures"] / "vertical_escape_corridor" / "top_view.png",
-        "vertical_escape_corridor_top_view.png",
+        dirs["figures"] / "vertical_exit" / "top_view.png",
+        "vertical_exit_top_view.png",
+    )
+    copy_to_selected(
+        dirs["figures"] / "tall_wall_side" / "top_view.png",
+        "tall_wall_side_top_view.png",
+    )
+    copy_to_selected(
+        dirs["figures"] / "low_wall_overflight" / "trajectory_3d.png",
+        "low_wall_overflight_3d.png",
     )
 
     # ── Проверки ───────────────────────────────────────────────────────────────
@@ -655,10 +693,10 @@ def main(skip_animation: bool = False) -> None:
         print(msg3)
         log_lines.append(msg3)
 
-    # 4. vertical_escape_corridor: overflight присутствует, max_z ∈ [1.7, 1.9], pair > 0.7
-    print("\n4. vertical_escape_corridor:")
-    log_lines.append("\n4. vertical_escape_corridor:")
-    df_vec, _, _ = results["vertical_escape_corridor"]
+    # 4. vertical_exit: overflight присутствует, max_z ∈ [1.4, 1.9], pair > 0.7
+    print("\n4. vertical_exit:")
+    log_lines.append("\n4. vertical_exit:")
+    df_vec, _, _ = results["vertical_exit"]
 
     vec_modes = set(df_vec["mode"].unique())
     ok_ov = "overflight" in vec_modes
@@ -668,10 +706,13 @@ def main(skip_animation: bool = False) -> None:
     print(m4a); log_lines.append(m4a)
 
     vec_max_z = df_vec["center_z"].max()
-    ok_z = bool(1.7 <= vec_max_z <= 1.95)
+    # В новой версии модели низкие препятствия имеют z_max=0.72, overflight_margin=0.55
+    # => ожидаемая высота overflight = 0.72 + 0.55 = 1.27 м (выше target_z=1.20).
+    # Допуск: max_center_z в диапазоне [1.25, 1.95] м.
+    ok_z = bool(1.25 <= vec_max_z <= 1.95)
     if not ok_z:
         all_ok = False
-    m4b = f"   max_center_z = {vec_max_z:.3f} (exp 1.7–1.9) : [{'OK' if ok_z else 'FAIL'}]"
+    m4b = f"   max_center_z = {vec_max_z:.3f} (exp 1.25–1.95) : [{'OK' if ok_z else 'FAIL'}]"
     print(m4b); log_lines.append(m4b)
 
     vec_min_cl = df_vec["min_obstacle_clearance"].replace([np.inf, -np.inf], np.nan).min()

@@ -89,8 +89,12 @@ pip install -r requirements.txt
 
 ## Запуск всех экспериментов
 
+Канонический файл симуляции — `swarm_3d_experiments1.py` (с тремя исправлениями
+относительно ранней версии: гибридный выбор стороны касательной, адаптивное
+EMA-сглаживание направления, явная F_target).
+
 ```bash
-python swarm_3d_experiments.py
+python swarm_3d_experiments1.py
 ```
 
 После запуска появится папка:
@@ -105,22 +109,30 @@ results_3d_extended/
 summary_all.csv
 ```
 
+Для генерации полного набора результатов под диплом используйте runner:
+
+```bash
+python final_thesis_runner.py --skip-animation
+```
+
+Результаты будут в `final_thesis_results/`.
+
 ## Запуск одного сценария
 
 ```bash
-python swarm_3d_experiments.py --scenario wide_barrier
+python swarm_3d_experiments1.py --scenario wide_barrier
 ```
 
 ## Запуск одного сценария с анимацией
 
 ```bash
-python swarm_3d_experiments.py --scenario wide_barrier --show
+python swarm_3d_experiments1.py --scenario wide_barrier --show
 ```
 
 или:
 
 ```bash
-python swarm_3d_experiments.py --scenario low_wall_overflight --show
+python swarm_3d_experiments1.py --scenario low_wall_overflight --show
 ```
 
 ## Доступные сценарии

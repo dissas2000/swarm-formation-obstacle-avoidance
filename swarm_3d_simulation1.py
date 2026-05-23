@@ -327,11 +327,35 @@ class AdaptiveFormationController3D:
 
     # ---------- force components ----------
 
-    def obstacle_force(self, drone: Drone3D, direction: np.ndarray) -> Tuple[np.ndarray, float]:
-        """F_i^obstacle = F_i^rep + F_i^tan."""
+    def obstacle_force(
+        self,
+        drone: Drone3D,
+        direction: np.ndarray,
+        center: Optional[np.ndarray] = None,
+        drones_all: Optional[List["Drone3D"]] = None,
+    ) -> Tuple[np.ndarray, float]:
+        """F_i^obstacle = F_i^rep + F_i^tan.
+
+        Касательная сторона определяется по виртуальному центру группы,
+        ТОЛЬКО если препятствие "общее" (видимо несколькими агентами
+        одновременно). Иначе используется локальное правило — это
+        даёт согласованность на длинных стенах, не теряя свободы при
+        одиночных препятствиях.
+        """
         f = np.zeros(3)
         min_clear = 1e9
-        for obs in self.obstacles:
+
+        # Сколько агентов видят каждое препятствие
+        crowd_count: Dict[int, int] = {}
+        if drones_all is not None:
+            for obs_idx, o in enumerate(self.obstacles):
+                cnt = 0
+                for d_other in drones_all:
+                    if cylinder_clearance(d_other.p, o, d_other.radius) < self.obs_detect:
+                        cnt += 1
+                crowd_count[obs_idx] = cnt
+
+        for obs_idx, obs in enumerate(self.obstacles):
             c = cylinder_clearance(drone.p, obs, drone.radius)
             min_clear = min(min_clear, c)
             if c < self.obs_detect:
@@ -339,11 +363,20 @@ class AdaptiveFormationController3D:
                 d = np.linalg.norm(away2)
                 if d < 1e-9:
                     continue
-                n2 = away2 / d
+                n2 = away2 / d  # локальная нормаль (для F_rep)
                 gap = max(c - self.obs_safe, 0.12)
                 gain = min(2.0, self.k_obs / (gap * gap))
-                # F_rep: нормальная компонента; F_tan: касательная (против локального минимума)
-                tangent2 = np.array([-n2[1], n2[0]])
+
+                # F_tan: согласованная сторона если препятствие общее
+                shared = (center is not None and crowd_count.get(obs_idx, 1) >= 2)
+                if shared:
+                    away_c = center[:2] - obs.center_xy
+                    d_c = np.linalg.norm(away_c)
+                    n_for_tan = away_c / d_c if d_c > 1e-9 else n2
+                else:
+                    n_for_tan = n2
+
+                tangent2 = np.array([-n_for_tan[1], n_for_tan[0]])
                 if np.dot(tangent2, direction[:2]) < 0:
                     tangent2 = -tangent2
                 f[:2] += gain * n2 + self.k_tan * gain * tangent2
@@ -396,7 +429,28 @@ class AdaptiveFormationController3D:
         """Один шаг интегрирования. Суммирует пять компонент силы:
             F_i = F_target + F_formation + F_obstacle + F_damping + F_height
         """
-        center, direction = self.sample_center(t * self.center_speed)
+        center, direction_raw = self.sample_center(t * self.center_speed)
+
+        # АДАПТИВНОЕ EMA-сглаживание direction. На прямых участках следуем быстро,
+        # на резких 90° поворотах — медленно (alpha от 0.008 до 0.053). Это
+        # удерживает min_agent_distance >= 0.6 при поворотах. Подобран grid-search.
+        if not hasattr(self, "_direction_smoothed") or self._direction_smoothed is None:
+            self._direction_smoothed = direction_raw.copy()
+        else:
+            cos_theta = float(
+                self._direction_smoothed[0] * direction_raw[0]
+                + self._direction_smoothed[1] * direction_raw[1]
+            )
+            cos_theta = max(-1.0, min(1.0, cos_theta))
+            alpha = 0.008 + 0.045 * max(0.0, cos_theta)
+            self._direction_smoothed = (
+                (1 - alpha) * self._direction_smoothed + alpha * direction_raw
+            )
+            ds_norm = np.linalg.norm(self._direction_smoothed)
+            if ds_norm > 1e-9:
+                self._direction_smoothed = self._direction_smoothed / ds_norm
+        direction = self._direction_smoothed
+
         mode = self.choose_mode(center, direction)
 
         desired_alt = self.target_z
@@ -417,7 +471,7 @@ class AdaptiveFormationController3D:
         for drone in drones:
             f_target = self.target_force(drone, center)
             f_form   = self.formation_force(drone, center, direction, mode, drones)
-            f_obs, c = self.obstacle_force(drone, direction)
+            f_obs, c = self.obstacle_force(drone, direction, center=center, drones_all=drones)
             f_damp   = -self.k_damp * drone.v
             f_height = self.height_force(drone, desired_alt)
 

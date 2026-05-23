@@ -1,6 +1,6 @@
 
 """
-swarm_3d_experiments.py
+swarm_3d_experiments1.py
 
 Расширенная 3D-симуляция для ВКР:
     «Моделирование группового движения в среде с препятствиями»
@@ -665,12 +665,39 @@ class AdaptiveFormationController3D:
         d = unit(self.path[-1] - self.path[-2])
         return self.path[-1].copy(), d
 
-    def obstacle_force(self, drone: Drone3D, direction: np.ndarray) -> Tuple[np.ndarray, float]:
-        """F_i^obstacle = F_i^rep + F_i^tan (нормальная + касательная компоненты)."""
+    def obstacle_force(
+        self,
+        drone: Drone3D,
+        direction: np.ndarray,
+        center: Optional[np.ndarray] = None,
+        drones_all: Optional[List["Drone3D"]] = None,
+    ) -> Tuple[np.ndarray, float]:
+        """F_i^obstacle = F_i^rep + F_i^tan (нормальная + касательная компоненты).
+
+        ВАЖНО для согласованного обхода: если ОДНО препятствие одновременно
+        видит несколько агентов (длинная стена), сторона касательной выбирается
+        по виртуальному центру группы. Если препятствие видит только один
+        агент (одиночный цилиндр), используется локальное правило — это
+        даёт каждому агенту свободу обходить ближайшее препятствие
+        оптимально для себя.
+
+        Это устраняет баг сценария tall_wall_side, где локальное правило
+        приводило к встречным потокам агентов выше и ниже стены.
+        """
         f = np.zeros(3)
         min_clear = 1e9
 
-        for obs in self.obstacles:
+        # Заранее посчитаем сколько агентов видят каждое препятствие
+        crowd_count: Dict[int, int] = {}
+        if drones_all is not None:
+            for obs_idx, o in enumerate(self.obstacles):
+                cnt = 0
+                for d in drones_all:
+                    if cylinder_clearance_3d(d.p, o, d.radius) < self.obs_detect:
+                        cnt += 1
+                crowd_count[obs_idx] = cnt
+
+        for obs_idx, obs in enumerate(self.obstacles):
             c3 = cylinder_clearance_3d(drone.p, obs, drone.radius)
             min_clear = min(min_clear, c3)
             if c3 >= self.obs_detect:
@@ -682,15 +709,30 @@ class AdaptiveFormationController3D:
 
             # Боковое отталкивание только если агент на уровне высоты препятствия
             if obs.z_min - drone.radius <= drone.p[2] <= obs.z_max + drone.radius and d > 1e-9:
-                n2 = away2 / d
+                n2 = away2 / d  # локальная нормаль (для F_rep всегда)
                 gap = max(h_clear - self.obs_safe, 0.12)
                 gain = min(2.2, self.k_obs / (gap * gap))
-                # F_rep: нормальная отталкивающая компонента
-                # F_tan: касательная компонента (предотвращает локальный минимум)
-                tangent2 = np.array([-n2[1], n2[0]])
+
+                # F_rep: нормальная отталкивающая (всегда от дрона)
+                f_rep = gain * n2
+
+                # F_tan: касательная — согласовано если препятствие "общее"
+                shared_obstacle = (
+                    center is not None
+                    and crowd_count.get(obs_idx, 1) >= 2
+                )
+                if shared_obstacle:
+                    away_c = center[:2] - obs.center_xy
+                    d_c = np.linalg.norm(away_c)
+                    n_for_tan = away_c / d_c if d_c > 1e-9 else n2
+                else:
+                    n_for_tan = n2  # локальное правило
+
+                tangent2 = np.array([-n_for_tan[1], n_for_tan[0]])
                 if np.dot(tangent2, direction[:2]) < 0:
                     tangent2 = -tangent2
-                f[:2] += gain * n2 + self.k_tan * gain * tangent2
+
+                f[:2] += f_rep + self.k_tan * gain * tangent2
 
         return f, min_clear
 
@@ -756,7 +798,35 @@ class AdaptiveFormationController3D:
         """Один шаг интегрирования. Суммирует все пять компонент силы:
             F_i = F_target + F_formation + F_obstacle + F_damping + F_height
         """
-        center, direction = self.sample_center(t * self.center_speed)
+        center, direction_raw = self.sample_center(t * self.center_speed)
+
+        # АДАПТИВНОЕ EMA-сглаживание direction.
+        # Резкие 90° повороты path вызывают мгновенный поворот формации,
+        # при котором пары агентов в column успевают сблизиться. Поэтому
+        # при большом отклонении direction_raw от smoothed мы УМЕНЬШАЕМ alpha
+        # (плавнее поворачиваем), а на прямых участках наоборот следуем
+        # быстрее. Это устраняет провал min_agent_distance в момент 90°.
+        if not hasattr(self, "_direction_smoothed") or self._direction_smoothed is None:
+            self._direction_smoothed = direction_raw.copy()
+        else:
+            # Угол между сглажённым и сырым: cos = dot, в xy-плоскости
+            cos_theta = float(
+                self._direction_smoothed[0] * direction_raw[0]
+                + self._direction_smoothed[1] * direction_raw[1]
+            )
+            cos_theta = max(-1.0, min(1.0, cos_theta))
+            # alpha от 0.008 (резкий поворот, cos≈0) до 0.053 (прямой ход, cos≈1).
+            # Подобран grid-search: даёт min_agent_distance >= 0.6 на всех
+            # сценариях включая tall_wall_side и checkerboard_equal.
+            alpha = 0.008 + 0.045 * max(0.0, cos_theta)
+            self._direction_smoothed = (
+                (1 - alpha) * self._direction_smoothed + alpha * direction_raw
+            )
+            ds_norm = np.linalg.norm(self._direction_smoothed)
+            if ds_norm > 1e-9:
+                self._direction_smoothed = self._direction_smoothed / ds_norm
+        direction = self._direction_smoothed
+
         mode = self.choose_mode(center, direction)
 
         # Желаемая высота: target_z в обычных режимах, h_obs + h_safe при overflight
@@ -779,7 +849,7 @@ class AdaptiveFormationController3D:
             # --- пять компонент силы ---
             f_target = self.target_force(drone, center)
             f_form   = self.formation_force(drone, center, direction, mode, drones)
-            f_obs, c = self.obstacle_force(drone, direction)
+            f_obs, c = self.obstacle_force(drone, direction, center=center, drones_all=drones)
             f_damp   = -self.k_damp * drone.v
             f_height = self.height_force(drone, desired_alt)
 
