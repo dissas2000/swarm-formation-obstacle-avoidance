@@ -1,0 +1,23 @@
+parameter,value,source_file,variable_name,comment
+N,5,swarm_3d_experiments1.py,N,число агентов в группе
+dt,0.05,swarm_3d_experiments1.py,dt,шаг численного интегрирования
+T,scenario_dependent,swarm_3d_experiments1.py,T,"длительность моделирования, зависит от сценария"
+mass,1.0,swarm_3d_experiments1.py,mass,нормированная масса агента
+agent_radius,0.24,swarm_3d_experiments1.py,agent_radius,эффективный радиус агента
+d_agent,0.64,swarm_3d_experiments1.py,d_agent,минимально допустимое расстояние между агентами
+d_safe,0.32,swarm_3d_experiments1.py,d_safe,безопасный запас до препятствий
+R_detect,0.95,swarm_3d_experiments1.py,R_detect,радиус обнаружения препятствий
+k_t,2.65,swarm_3d_experiments1.py,k_t,коэффициент притяжения к цели
+k_f,2.65,swarm_3d_experiments1.py,k_f,коэффициент возврата к желаемому положению
+k_sep,1.9,swarm_3d_experiments1.py,k_sep,коэффициент разделения агентов
+k_coh,0.07,swarm_3d_experiments1.py,k_coh,коэффициент связности группы
+k_obs,0.85,swarm_3d_experiments1.py,k_obs,коэффициент отталкивания от препятствий
+k_tan,0.72,swarm_3d_experiments1.py,k_tan,коэффициент касательной компоненты обхода
+beta,1.18,swarm_3d_experiments1.py,beta,коэффициент демпфирования
+k_z,3.0,swarm_3d_experiments1.py,k_z,коэффициент стабилизации высоты
+beta_z,1.2,swarm_3d_experiments1.py,beta_z,коэффициент вертикального демпфирования
+v_max,1.05,swarm_3d_experiments1.py,v_max,максимальная допустимая скорость
+F_max,3.0,swarm_3d_experiments1.py,F_max,максимальная допустимая сила
+h_max,2.15,swarm_3d_experiments1.py,h_max,максимальная допустимая высота
+h_safe,0.55,swarm_3d_experiments1.py,h_safe,вертикальный запас при перелёте
+L,not_logged,swarm_3d_experiments1.py,L,число узлов проверки gamma-коридора
